@@ -1,0 +1,258 @@
+
+Periodic structures
+========================================================
+
+
+```{r, echo=FALSE, message=FALSE}
+library(ggplot2)
+library(dplyr)
+```
+
+```{r, echo=FALSE}
+# Input 
+Al_wysokosc <- read.delim("data/01_Aluminium_wysokosc", header=F, dec=",")
+Al_period <- read.delim("data/01_Aluminium_period", header=F, dec=",")
+PCDTBT_wysokosc <- read.delim("data/02_PCDTBT_wysokosc", header=F, dec=",")
+PCDTBT_period <- read.delim("data/02_PCDTBT_period", header=F, dec=",")
+
+
+laczenie_danych <- function(plik, opis_columny, opis_materialu){
+    row.names(plik) <- NULL
+    colnames(plik) <- opis_columny
+    plik$Name <-  opis_materialu
+    return(plik)
+}
+
+Al_wysokosc = laczenie_danych(Al_wysokosc, "Height", "Al")
+Al_period = laczenie_danych(Al_period, "period", "Al")
+
+
+PCDTBT_wysokosc = laczenie_danych(PCDTBT_wysokosc, "Height", "PCDBTB")
+PCDTBT_period = laczenie_danych(PCDTBT_period, "period", "PCDTBT")
+
+period <- NULL
+period <- bind_rows(Al_period, PCDTBT_period)
+
+wysokosc <- NULL
+wysokosc <- bind_rows(Al_wysokosc,PCDTBT_wysokosc )
+
+profil_Al_przeskalowane <- read.delim("data/profil_Al_przeskalowane.txt", header=F)
+
+profil_PCBFDTB_przeskalowane <- read.delim("data/profil_PCBFDTB_przeskalowane.txt", header=F)
+```
+
+## Morphology analysis 
+> Based on AFM images - determined the height and period of structures
+
+### Height
+```{r, echo=FALSE, message=FALSE}
+# Distribution
+ggplot(wysokosc, aes(Name, Height)) + 
+  geom_boxplot() + geom_dotplot(binaxis = "y", stackdir = "center", position = "dodge",  dotsize = 0.5, fill="red")+
+  theme_bw(base_size = 28) +
+  xlab("") + 
+  ylab("Height (nm)")
+
+wysokosc %>% 
+  group_by(Name) %>% 
+  summarise(mean = mean(Height), sd = sd(Height))
+
+t.test(Al_wysokosc$Height, PCDTBT_wysokosc$Height)
+```
+
+> Summary: There is the difference in height between a pure Al electrode and an active layer 
+
+### Period
+```{r, echo=FALSE, message=FALSE}
+ggplot(period, aes(Name, period*1000)) +
+  geom_boxplot() + geom_dotplot(binaxis = "y", stackdir = "center", position = "dodge",  dotsize = 0.5, fill="red")+
+  theme_bw(base_size = 28) +
+  xlab("") + 
+  ylab("Period (nm)")
+
+period %>%
+group_by(Name) %>% 
+  summarise(mean = mean(period), sd = sd(period))
+
+t.test(Al_period$period,  PCDTBT_period$period)
+```
+
+
+
+```{r, echo=FALSE, message=FALSE}
+rys_profil <- function(name){
+        # name - profil AFM
+        # os x: mikro m
+        # os y: nm
+  
+        ggplot(name, aes(V1*10^6, V2*10^9)) +
+        geom_line() + 
+        theme_bw(base_size = 28) +
+        ylab("z (nm)") +
+        xlab(expression(paste("x (", mu, "m)"))) + 
+        xlim(c(0, 5))
+         }
+```
+
+### PCDTBT profile
+```{r, echo=FALSE, message=FALSE}
+rys_profil(profil_PCBFDTB_przeskalowane)
+```
+
+### Al profile
+```{r, echo=FALSE, message=FALSE}
+rys_profil(profil_Al_przeskalowane)
+```
+
+
+
+
+## Solar cells with periodic active layers
+> Based on current-voltage charasteristics determined the devices parameters 
+
+```{r, echo=FALSE, message=FALSE}
+OPV_DVD <- read.delim("data/12_Seria_IX_RP3HT_DVD")
+OPV_DVD$Solar=as.factor(OPV_DVD$Solar)
+OPV_DVD = OPV_DVD[-1,]
+
+OPV_DVD %>%
+  filter(Solar == 1 | Solar == 2 )  %>%
+  filter(Pixel != 4) -> OPV_flat
+
+OPV_DVD %>% 
+  filter(Solar == 3| Solar == 4) %>%
+  filter(Pixel != 4) -> OPV_imprinted
+
+OPV_flat$Ref = "Flat"
+OPV_imprinted$Ref = "Imprinted"
+OPV = bind_rows(OPV_flat, OPV_imprinted)
+```
+
+
+### Compare flat active layer to imprinted active layer (DVD structures)
+```{r, echo=FALSE, message=FALSE}
+
+ggplot(OPV, aes(Ref, Isc_1))+
+  geom_boxplot() + geom_dotplot(binaxis = "y", stackdir = "center", position = "dodge",  dotsize = 0.5, fill="red")+
+  theme_bw(base_size = 28) +
+  xlab("") + 
+  ylab(expression(paste("Isc (", mA/cm^{2}, ")", sep = " ")))
+
+
+
+OPV %>% 
+  filter(Pixel != 4)%>%
+  group_by(Ref) %>%
+  summarise(mean_isc = mean(Isc_1), sd_isc = sd(Isc_1), mean_Voc_1 = mean(Voc_1), sd_Voc_1 = sd(Voc_1), mean_ff = mean(FF_1), sd_ff = sd(FF_1), mean_eff = mean(EFF_1), sd_Eff = sd(EFF_1), n = length(Isc_1)) 
+
+
+t.test(OPV_flat$Isc_1, OPV_imprinted$Isc_1 )
+```
+> Summary: There is a difference in Isc between imprinted and flat layers. The higher results were obtained for imprinted layers.  
+
+
+
+
+```{r, echo=FALSE, message=FALSE}
+rys_boxplot_isc <- function(name, limits){
+  ggplot(name, aes(Ref, Isc_1))+
+  geom_boxplot()+
+  stat_summary(fun.y=mean, geom="point", shape=23, size=4) + 
+  ylab(expression(paste("Jsc (", mA/cm^{2}, ")", sep = " ")))+
+  xlab("")+
+  scale_x_discrete(limits=limits)+
+  theme_bw(base_size = 28)
+
+  
+}
+
+rys_boxplot_voc <- function(name,limits){
+  ggplot(name, aes(Ref, Voc_1))+
+  geom_boxplot()+
+  stat_summary(fun.y=mean, geom="point", shape=23, size=4) + 
+  ylab("Voc (V)")+
+  xlab("")+
+  scale_x_discrete(limits=limits)+
+  theme_bw(base_size = 28)
+
+}
+
+rys_boxplot_ff <- function(name, limits){
+  ggplot(name, aes(Ref, FF_1))+
+  geom_boxplot()+
+  stat_summary(fun.y=mean, geom="point", shape=23, size=4) + 
+  ylab("FF (%)")+
+  xlab("")+
+  scale_x_discrete(limits=limits)+
+  theme_bw(base_size = 28)
+
+}
+
+
+rys_boxplot_eff <- function(name, limits){
+  ggplot(name, aes(Ref, EFF_1))+
+  geom_boxplot()+
+  stat_summary(fun.y=mean, geom="point", shape=23, size=4) + 
+  ylab("Efficiency(%)")+
+  xlab("")+
+  scale_x_discrete(limits=limits)+
+      theme_bw(base_size = 28)
+
+}
+
+rys_boxplot <- function(name, limits){
+  print(rys_boxplot_isc(name, limits))
+  print(rys_boxplot_voc(name, limits))
+  print(rys_boxplot_ff (name, limits))
+  print(rys_boxplot_eff(name,limits))
+}
+
+
+
+
+
+```
+### Summary boxplots 
+```{r, echo=FALSE, message=FALSE}
+limits = c("Flat","Imprinted")
+rys_boxplot(OPV, limits)
+```
+
+### Characterisitcs
+> Example of I-V characteristics for flat and imprinted layer
+
+```{r, echo=FALSE, message=FALSE}
+OSIX_ogn3_piks1 <- read.csv("data/S_OSIX_ogn3_piks_1_DVD.dat", sep="")
+OSIX_ogn3_piks1$Ref = "Imprinted"
+
+OSIX_ogn2_piks5 <- read.csv("data/S_OSIX_ogn2_piks_5.dat", sep="")
+OSIX_ogn2_piks5$Ref= "Flat"
+
+OSIX_charcteristic = bind_rows(OSIX_ogn3_piks1, OSIX_ogn2_piks5)
+
+Fig_characteristics <- function(data){
+  labels=c("Flat", "Imprinted")
+  
+  ggplot(data, aes(voltage, current_na_cm2, color = Ref))+
+  geom_hline(yintercept = 0) +
+  geom_line(size=1)+
+  geom_point(aes(shape=Ref), size=3)+
+  ylab(expression(paste("Isc (", mA/cm^{2}, ")", sep = " ")))+
+  xlab("Voltage (V)")+
+  coord_cartesian(ylim=c(-4.5, 10.5), xlim = c(0,0.75))+
+  scale_y_continuous(breaks=seq(-4,10, 2))+
+  scale_color_discrete(name="Active layer", limits=labels, labels=labels, h=c(0,240)+15)+
+  scale_shape_discrete(name="Active layer", limits=labels, labels=labels)+
+  guides(colour = guide_legend(override.aes = list(size=5, linetype=0)))+
+  theme_bw(base_size = 20)+
+  theme(legend.position = "top")
+
+}
+  
+
+Fig_characteristics(OSIX_charcteristic)
+```
+
+
+
+
