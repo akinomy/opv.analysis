@@ -3,7 +3,9 @@
 Examples of data analysis and visualization used in my PhD project.
 
 Workflow: 
-* experimental part: preparation of devices, measurement of current-voltage characteristic
-* data preparation: use iv.ovp package (https://github.com/akinomy/iv.opv.package) to obtain devices parameters
+* Experimental part: preparation of devices, measurement of current-voltage characteristic
+* Data preparation:
+** from raw data to device parameter (FF, Voc, Isc, Efficiency) 
+** use iv.ovp package (https://github.com/akinomy/iv.opv.package)
 * Exploratory data analysis: library (dplyr)
-* visualization: library (ggplot2)
+* Visualization: library (ggplot2)
